@@ -26,7 +26,7 @@ func main() {
 					fmt.Println("  **** "+msg.Name+" Webbrick found! DEV ID is ", msg.DeviceInfo.DevID, " value of ", strconv.Itoa(int(msg.DeviceInfo.Level)))
 				case "newwebbrickfound", "newtriggerfound", "newbuttonfound":
 					fmt.Println("  **** "+msg.Name+" Webbrick found! DEV ID is", msg.DeviceInfo.DevID)
-					webbrick.GetWBStatus(msg.DeviceInfo.DevID)
+					webbrick.PollWBStatus(msg.DeviceInfo.DevID)
 					//orvibo.Subscribe() // Subscribe to any unsubscribed sockets
 					//orvibo.Query()     // And query any unqueried sockets
 				case "queried":
