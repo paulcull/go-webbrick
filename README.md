@@ -7,6 +7,8 @@ go-webbrick is an event driver library for controlling the old WebBrick HA produ
 - Supports Buttons
 - Supports Triggers
 - Supports Temperatures
+- Supports PIR w/split on buttons vs pir's
+- Supports exclusion list
 
 
 Usage
@@ -18,10 +20,6 @@ To run the test, simply run `go run main.go` from the directory.
 
 To Do
 =====
-
- - [ ] Add in PIR support
- - [ ] Add Exclusion of redundant hardware devices
- - [ ] Add split for PIR and Buttons
 
  - [ ] Rewrite it completely because the first version is always poor
  - [ ] Code cleanup

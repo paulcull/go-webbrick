@@ -201,11 +201,8 @@ const (
 	TEMP      // Temp sensor
 	STATE     // State
 	HEARTBEAT // Heartbeat
+
 )
-
-// exlcusion := {""}
-
-// pirs := {""}
 
 //////////////////////////////////
 //
@@ -217,7 +214,7 @@ var conn *net.UDPConn // UDP Connection
 var DEBUG = false
 var POLL = true
 
-const PollingTime = 30 // seconds
+const PollingTime = 600 // seconds
 
 var Events = make(chan EventStruct, 1) // Events is our events channel which will notify calling code that we have an event happening
 var Devices = make(map[string]*Device) // All the Devices we've discovered
@@ -291,11 +288,15 @@ func CheckForMessages() (bool, error) { // Now we're checking for messages
 // Poller for getting Status on WB's in one go
 func PollWBStatus(devID string) (int, error) {
 
-	for _ = range time.Tick(PollingTime * time.Second) {
-		//success, err := GetWBStatus(devID)
-		GetWBStatus(devID)
+	// Run straight away
+	GetWBStatus(devID)
+	// then run based on the interval
+	if POLL {
+		for _ = range time.Tick(PollingTime * time.Second) {
+			fmt.Println("   **** Polling WBStatus & Config for ", devID)
+			GetWBStatus(devID)
+		}
 	}
-
 	return 1, nil
 
 }
@@ -303,9 +304,7 @@ func PollWBStatus(devID string) (int, error) {
 // Get WB Status on Initilisation
 func GetWBStatus(devID string) (int, error) {
 
-	if !DEBUG {
-		fmt.Println("   **** Getting WBStatus & Config for ", devID)
-	}
+	fmt.Println("   **** Getting WBStatus & Config for ", devID)
 
 	var success int
 	var statusCommand string
@@ -331,6 +330,7 @@ func GetWBStatus(devID string) (int, error) {
 	respbody, err := ioutil.ReadAll(resp.Body) // read out the reponsse body
 	if err != nil {
 		fmt.Println("Empty Body in http request for " + Devices[devID].IP.String())
+		return 0, err
 	} else {
 		success = 1
 	}
@@ -344,12 +344,16 @@ func GetWBStatus(devID string) (int, error) {
 	xmlerr := decoder.Decode(&_wbs)           // unmarshall the xml
 	if xmlerr != nil {
 		fmt.Printf("error: %v", xmlerr)
-		//return
+		return 0, xmlerr
 	} else {
 		fmt.Println("      **** Got WebbrickStatus ok for ", devID)
 
 	}
+
 	//fmt.Printf("%+v\n", _wbs)
+	if DEBUG {
+		spew.Dump(_wbs)
+	}
 
 	///////////////////////////////
 	//
@@ -369,6 +373,7 @@ func GetWBStatus(devID string) (int, error) {
 		fmt.Println("Empty Body in http request for " + Devices[devID].IP.String())
 		success = 0
 		err = wbcerr
+		return success, wbcerr
 	} else {
 		success = 1
 	}
@@ -382,13 +387,16 @@ func GetWBStatus(devID string) (int, error) {
 	wbcxmlerr := wbcdecoder.Decode(&_wbc)        // unmarshall the xml
 	if wbcxmlerr != nil {
 		fmt.Printf("error: %v", wbcxmlerr)
-		//return
+		return 0, wbcxmlerr
 	} else {
 		fmt.Println("      **** Got WebbrickConfig ok for ", _wbc.Name)
-		success = 0
-		err = wbcxmlerr
+		success = 1
+		//err = wbcxmlerr
 	}
 	//fmt.Printf("%+v\n", _wbc)
+	if DEBUG {
+		spew.Dump(_wbc)
+	}
 
 	mapDevices, mderr := CreateBrickDevices(_wbc, _wbs)
 
@@ -396,6 +404,7 @@ func GetWBStatus(devID string) (int, error) {
 		fmt.Println("error mapping devices %v", mderr)
 		success = mapDevices
 		err = mderr
+		return 0, mderr
 	}
 
 	if DEBUG {
@@ -420,9 +429,35 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 	success = 1
 	err = nil
 
+	// Setup some lists
+	PIRS := map[string]bool{
+		"2::TD::0":  true,
+		"2::TD::2":  true,
+		"2::TD::11": true,
+	}
+
+	// Setup some lists
+	EXCLUDE := map[string]bool{
+		"2::DO::1": true, "2::DO::2": true, "2::DO::3": true, "2::DO::4": true, "2::DO::5": true, "2::DO::6": true, "2::DO::7": true,
+		"2::AO::1": true,
+		"2::CT::3": true, "2::CT::4": true,
+		"3::DO::0": true, "3::DO::1": true, "3::DO::2": true, "3::DO::3": true, "3::DO::4": true, "3::DO::5": true, "3::DO::6": true, "3::DO::7": true,
+		"3::AO::1": true,
+		"3::CT::0": true, "3::CT::1": true, "3::CT::2": true, "3::CT::3": true, "3::CT::4": true,
+		"4::DO::0": true, "4::DO::1": true, "4::DO::2": true, "4::DO::3": true, "4::DO::4": true, "4::DO::5": true, "4::DO::6": true, "4::DO::7": true,
+		"4::AO::0": true,
+		"4::CT::1": true, "4::CT::2": true, "4::CT::3": true, "4::CT::4": true,
+		"5::TD::1": true, "5::TD::2": true, "5::TD::3": true, "5::TD::4": true,
+		"6::DO::0": true, "6::DO::1": true, "6::DO::2": true, "6::DO::3": true, "6::DO::4": true, "6::DO::5": true, "6::DO::6": true, "6::DO::7": true,
+		"6::AO::0": true,
+		"6::CT::2": true, "6::CT::3": true, "6::CT::4": true,
+		"7::DO::0": true, "7::DO::1": true, "7::DO::2": true, "7::DO::3": true, "7::DO::4": true, "7::DO::5": true, "7::DO::6": true, "7::DO::7": true,
+		"7::CT::1": true, "7::CT::2": true, "7::CT::3": true, "7::CT::4": true,
+	}
+
 	_ip = net.ParseIP(_wbc.IP.IPString)
 
-	fmt.Println("      **** Creating Devices for ", _wbc.Name)
+	fmt.Println("      **** Checking Devices for ", _wbc.Name)
 
 	// Lights - AO
 	for light := range _wbs.AOs.AO {
@@ -432,105 +467,141 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 		// // Calculate the UID
 		UID := strconv.Itoa(_wbs.BrickNo) + "::AO::" + strconv.Itoa(light)
-		if _wbs.AOs.AO[light].Value > 0 {
-			_state = false
-			_message = _wbc.NAs.NA[light].Name + " is off"
+		if !EXCLUDE[UID] {
+			if _wbs.AOs.AO[light].Value > 0 {
+				_state = false
+				_message = _wbc.NAs.NA[light].Name + " is off"
+			} else {
+				_state = true
+				_message = _wbc.NAs.NA[light].Name + " is on at " + strconv.Itoa(_wbs.AOs.AO[light].Value) + "%"
+			}
+
+			// Check to see if we've already got macAdd in our array
+			_, ok := Devices[UID]
+
+			if ok == false { // we haven't got this in our Devices array
+				deviceCount++
+				Devices[UID] = &Device{deviceCount, UID, "", LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
+				passMessage("newlightchannelfound", *Devices[UID])
+				fmt.Println("        **** Creating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
+			} else {
+				Devices[UID].State = _state
+				Devices[UID].Level = _wbs.AOs.AO[light].Value
+				Devices[UID].LastMessage = _message
+				passMessage("existinglightchannelupdated", *Devices[UID])
+				fmt.Println("        **** Updating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
+			}
 		} else {
-			_state = true
-			_message = _wbc.NAs.NA[light].Name + " is on at " + strconv.Itoa(_wbs.AOs.AO[light].Value) + "%"
+			fmt.Println("        **** Excluding Light Device for ", UID)
+
 		}
-
-		// Check to see if we've already got macAdd in our array
-		_, ok := Devices[UID]
-
-		if ok == false { // we haven't got this in our Devices array
-			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
-			passMessage("newlightchannelfound", *Devices[UID])
-			fmt.Println("        **** Creating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
-		} else {
-			Devices[UID].State = _state
-			Devices[UID].Level = _wbs.AOs.AO[light].Value
-			Devices[UID].LastMessage = _message
-			passMessage("existinglightchannelupdated", *Devices[UID])
-			fmt.Println("        **** Updating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
-		}
-
 	}
 
 	//Buttons  & PIR
 	for digitalIn := range _wbc.CDs.CD {
 
 		var _message string
-		_message = _wbc.CDs.CD[digitalIn].Name + " has been pressed"
 
 		// // Calculate the UID
 		UID := strconv.Itoa(_wbs.BrickNo) + "::TD::" + strconv.Itoa(digitalIn)
 
-		// Check to see if we've already got macAdd in our array
-		_, ok := Devices[UID]
+		if !EXCLUDE[UID] {
 
-		if ok == false { // we haven't got this in our Devices array
-			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", BUTTON, digitalIn, _ip, true, true, false, 0, _message}
-			passMessage("newbuttonfound", *Devices[UID])
-			fmt.Println("        **** Creating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
+			// Check to see if we've already got macAdd in our array
+			_, ok := Devices[UID]
+
+			if ok == false { // we haven't got this in our Devices array
+				if !PIRS[UID] { // handle PIR from list, as you can't tell the difference normally
+					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
+					deviceCount++
+					Devices[UID] = &Device{deviceCount, UID, "", BUTTON, digitalIn, _ip, true, true, false, 0, _message}
+					passMessage("newbuttonfound", *Devices[UID])
+					fmt.Println("        **** Creating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
+				} else {
+					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
+					deviceCount++
+					Devices[UID] = &Device{deviceCount, UID, "", PIR, digitalIn, _ip, true, true, false, 0, _message}
+					passMessage("newpirfound", *Devices[UID])
+					fmt.Println("        **** Creating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
+
+				}
+			} else {
+				if !PIRS[UID] {
+					_message = _wbc.CDs.CD[digitalIn].Name + " has been pressed"
+					Devices[UID].LastMessage = _message
+					passMessage("existingbuttonupdated", *Devices[UID])
+					fmt.Println("        **** Updating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
+				} else {
+					_message = _wbc.CDs.CD[digitalIn].Name + " has been pressed"
+					Devices[UID].LastMessage = _message
+					passMessage("existingpirupdated", *Devices[UID])
+					fmt.Println("        **** Updating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
+				}
+			}
 		} else {
-			Devices[UID].LastMessage = _message
-			passMessage("existingbuttonupdated", *Devices[UID])
-			fmt.Println("        **** Updating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
-		}
+			fmt.Println("        **** Excluding Trigger Device for ", UID)
 
+		}
 	}
 
 	// Hardware State
 	for digitalOut := range _wbc.NOs.NO {
 
 		var _message string
-		_message = _wbc.NOs.NO[digitalOut].Name + " state has changed"
 
 		// // Calculate the UID
 		UID := strconv.Itoa(_wbs.BrickNo) + "::TD::" + strconv.Itoa(digitalOut)
 
-		// Check to see if we've already got macAdd in our array
-		_, ok := Devices[UID]
+		if !EXCLUDE[UID] {
+			// Check to see if we've already got macAdd in our array
+			_, ok := Devices[UID]
 
-		if ok == false { // we haven't got this in our Devices array
-			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", STATE, digitalOut, _ip, true, true, false, 0, _message}
-			passMessage("newoutputfound", *Devices[UID])
-			fmt.Println("        **** Creating State Device for ", UID, _wbc.NOs.NO[digitalOut])
+			if ok == false { // we haven't got this in our Devices array
+				deviceCount++
+				_message = _wbc.NOs.NO[digitalOut].Name + " state has been found"
+				Devices[UID] = &Device{deviceCount, UID, "", STATE, digitalOut, _ip, true, true, false, 0, _message}
+				passMessage("newoutputfound", *Devices[UID])
+				fmt.Println("        **** Creating State Device for ", UID, _wbc.NOs.NO[digitalOut])
+			} else {
+				_message = _wbc.NOs.NO[digitalOut].Name + " state has changed"
+				Devices[UID].LastMessage = _message
+				passMessage("existingoutputupdated", *Devices[UID])
+				fmt.Println("        **** Updating State Device for ", UID, _wbc.NOs.NO[digitalOut])
+			}
 		} else {
-			Devices[UID].LastMessage = _message
-			passMessage("existingoutputupdated", *Devices[UID])
-			fmt.Println("        **** Updating State Device for ", UID, _wbc.NOs.NO[digitalOut])
-		}
+			fmt.Println("        **** Excluding State Device for ", UID)
 
+		}
 	}
 
 	// Temps State
 	for temp := range _wbc.CTs.CT {
 
 		var _message string
-		_message = _wbc.CTs.CT[temp].Name + " temperature value has changed to " + strconv.Itoa(_wbs.Tmps.Tmp[temp].Value)
+		_message = _wbc.CTs.CT[temp].Name + " temperature value is " + strconv.Itoa(_wbs.Tmps.Tmp[temp].Value)
 
-		// // Calculate the UID
-		UID := strconv.Itoa(_wbs.BrickNo) + "::TD::" + strconv.Itoa(temp)
+		// Calculate the UID
+		UID := strconv.Itoa(_wbs.BrickNo) + "::CT::" + strconv.Itoa(temp)
 
-		// Check to see if we've already got macAdd in our array
-		_, ok := Devices[UID]
+		if !EXCLUDE[UID] {
+			// Check to see if we've already got macAdd in our array
+			_, ok := Devices[UID]
 
-		if ok == false { // we haven't got this in our Devices array
-			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", STATE, temp, _ip, true, true, false, _wbs.Tmps.Tmp[temp].Value, _message}
-			passMessage("newtempfound", *Devices[UID])
-			fmt.Println("        **** Creating Temperature Device for ", UID, _wbc.CTs.CT[temp])
+			if ok == false { // we haven't got this in our Devices array
+				deviceCount++
+				Devices[UID] = &Device{deviceCount, UID, "", STATE, temp, _ip, true, true, false, _wbs.Tmps.Tmp[temp].Value, _message}
+				passMessage("newtempfound", *Devices[UID])
+				fmt.Println("        **** Creating Temperature Device for ", UID, _wbc.CTs.CT[temp])
+			} else {
+				Devices[UID].LastMessage = _message
+				passMessage("existingtempupdated", *Devices[UID])
+				fmt.Println("        **** Updating Temperature Device for ", UID, _wbc.CTs.CT[temp])
+			}
+
 		} else {
-			Devices[UID].LastMessage = _message
-			passMessage("existingtempupdated", *Devices[UID])
-			fmt.Println("        **** Updating Temperature Device for ", UID, _wbc.CTs.CT[temp])
-		}
+			fmt.Println("        **** Excluding Temperature Device for ", UID)
 
+		}
 	}
 
 	return success, err
@@ -599,39 +670,25 @@ func SetState(devID string, state bool) (bool, error) {
 
 }
 
-// GetState sets the state of a socket, given its MAC address
-func GetState(devID string) (int, error) {
+////////////////////////////////////////////////
+//
+// Helpers
+//
+////////////////////////////////////////////////
 
-	//var command string
+// GetState gets the state of a device, given its ID
+func GetState(devID string) bool {
+	return Devices[devID].State
+}
 
-	switch Devices[devID].Type {
+// GetLevel gets the level of a device, given its ID
+func GetLevel(devID string) int {
+	return Devices[devID].Level
+}
 
-	// // Its a light
-	// case LIGHT:
-	// 	// create and send the command
-	// 	command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.Itoa(Devices[devID].Level)
-	// 	success, err := sendCommand(command, devID)
-	// 	//success, err := sendMessage("686400176463"+macAdd+twenties+"00000000"+statebit, Devices[macAdd].IP)
-	// 	passMessage("lightset:"+strconv.Itoa(Devices[devID].Level), *Devices[devID])
-	// 	command = ""
-	// 	return success, err
-
-	// // Its a fake button to trigger the DI
-	// case BUTTON:
-	// 	// create and send the command
-	// 	command = "http://" + Devices[devID].IP.String() + "/hid.spi?DI" + strconv.Itoa(Devices[devID].Channel)
-	// 	success, err := sendCommand(command, devID)
-	// 	//success, err := sendMessage("686400176463"+macAdd+twenties+"00000000"+statebit, Devices[macAdd].IP)
-	// 	passMessage("button", *Devices[devID])
-	// 	command = ""
-	// 	return success, err
-
-	// // don't know what to do or how to do it
-	default:
-		//command = ""
-		return 0, errors.New("Can't set state on " + strconv.Itoa(Devices[devID].Type))
-	}
-
+// GetLevel gets the level of a device, given its ID
+func GetLastMessage(devID string) string {
+	return Devices[devID].LastMessage
 }
 
 // ==================
