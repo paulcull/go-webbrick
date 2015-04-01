@@ -291,6 +291,7 @@ func PollWBStatus(devID string) (int, error) {
 	// Run straight away
 	GetWBStatus(devID)
 	// then run based on the interval
+
 	if POLL {
 		for _ = range time.Tick(PollingTime * time.Second) {
 			fmt.Println("   **** Polling WBStatus & Config for ", devID)
@@ -309,6 +310,7 @@ func GetWBStatus(devID string) (int, error) {
 	var success int
 	var statusCommand string
 	var configCommand string
+	// will need to use the gateway if the call is outside the local network
 	// statusCommand = "http://" + gwURL + ":" + gwPORT + "/wbproxy/" + Devices[devID].IP.String() + "/WbStatus.xml"
 	// configCommand = "http://" + gwURL + ":" + gwPORT + "/wbproxy/" + Devices[devID].IP.String() + "/WbCfg.xml"
 	statusCommand = "http://" + Devices[devID].IP.String() + "/WbStatus.xml"
@@ -621,6 +623,40 @@ func ToggleState(devID string) (bool, error) {
 	}
 
 	return SetState(devID, true)
+}
+
+func SetLevel(devID string, level float64) (bool, error) {
+
+	var command string
+
+	switch Devices[devID].Type {
+
+	// Its a light
+	case LIGHT:
+		// update the record for new levels
+		Devices[devID].Level = int(level)
+		//var statebit string
+		if Devices[devID].Level == 0 {
+			Devices[devID].State = false
+		} else {
+			Devices[devID].State = true
+		}
+
+		// create and send the command
+		command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.Itoa(Devices[devID].Level)
+		success, err := sendCommand(command, devID)
+
+		//success, err := sendMessage("686400176463"+macAdd+twenties+"00000000"+statebit, Devices[macAdd].IP)
+		passMessage("lightset:"+strconv.Itoa(Devices[devID].Level), *Devices[devID])
+		command = ""
+		return success, err
+
+	// don't know what to do or how to do it
+	default:
+		command = ""
+		return false, errors.New("Can't set value on " + strconv.Itoa(Devices[devID].Type))
+	}
+
 }
 
 // SetState sets the state of a socket, given its MAC address
