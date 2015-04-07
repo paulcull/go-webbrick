@@ -4,19 +4,34 @@ package webbrick
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset" // For XML conversion
-	_ "code.google.com/p/go-charset/data"  // Specs for dataset conversion
-	"encoding/xml"                         // For XML work
-	"errors"                               // For crafting our own errors
-	"fmt"                                  // For outputting stuff
-	"github.com/davecgh/go-spew/spew"      // For neatly outputting stuff
-	"io/ioutil"                            // HTTP body response processing
-	"net"                                  // For networking stuff - for UDP
-	"net/http"                             // For web http calls
-	"reflect"                              // Type Get
-	"strconv"                              // For String construction
-	"time"                                 // For Poller
+	"code.google.com/p/go-charset/charset"   // For XML conversion
+	_ "code.google.com/p/go-charset/data"    // Specs for dataset conversion
+	"encoding/xml"                           // For XML work
+	"errors"                                 // For crafting our own errors
+	"fmt"                                    // For outputting stuff
+	"github.com/davecgh/go-spew/spew"        // For neatly outputting stuff
+	"github.com/ninjasphere/go-ninja/logger" // to support Ninjasphere logging if passed
+	"io/ioutil"                              // HTTP body response processing
+	"net"                                    // For networking stuff - for UDP
+	"net/http"                               // For web http calls
+	"reflect"                                // Type Get
+	"strconv"                                // For String construction
+	"time"                                   // For Poller
 )
+
+var myLog = logger.GetLogger("WebBrick")
+
+// EventStruct is our equivalent to node.js's Emitters, of sorts.
+// This basically passes back to our Event channel, info about what event was raised
+// (e.g. Device, plus an event name) so we can act appropriately
+type WebbrickDriverConfig struct {
+	Name string
+	//	NinjaLogControl *logger.Logger
+	Initialised     bool
+	NumberOfDevices int
+	PollingMinutes  int
+	PollingActive   bool
+}
 
 // EventStruct is our equivalent to node.js's Emitters, of sorts.
 // This basically passes back to our Event channel, info about what event was raised
@@ -28,17 +43,17 @@ type EventStruct struct {
 
 // Device is info about the type of device that's been detected (socket, allone etc.)
 type Device struct {
-	ID          int    // The ID of our device
-	DevID       string // The full Device ID
-	Name        string // The name of our item
-	Type        int    // What type of device this is. See the const below for valid types
-	Channel     int    // Which Device Channel
-	IP          net.IP // The IP address of our item
-	Subscribed  bool   // Have we subscribed to this item yet? Doing so lets us control
-	Queried     bool   // Have we queried this item for it's name and details yet?
-	State       bool   // Is the item turned on or off? Will always be "false" for the AllOne, which doesn't do states, just IR & 433
-	Level       int    // What is the level of the device
-	LastMessage string // The last message to come through for this device
+	ID          int     // The ID of our device
+	DevID       string  // The full Device ID
+	Name        string  // The name of our item
+	Type        int     // What type of device this is. See the const below for valid types
+	Channel     int     // Which Device Channel
+	IP          net.IP  // The IP address of our item
+	Subscribed  bool    // Have we subscribed to this item yet? Doing so lets us control
+	Queried     bool    // Have we queried this item for it's name and details yet?
+	State       bool    // Is the item turned on or off? Will always be "false" for the AllOne, which doesn't do states, just IR & 433
+	Level       float64 // What is the level of the device
+	LastMessage string  // The last message to come through for this device
 }
 
 //////////////////////////////////
@@ -85,22 +100,22 @@ type WebbrickStatus struct {
 }
 
 type Tmp struct {
-	Id    int `xml:"id,attr"`
-	Low   int `xml:"lo,attr"`
-	High  int `xml:"hi,attr"`
-	Value int `xml:",chardata"`
+	Id    int     `xml:"id,attr"`
+	Low   int     `xml:"lo,attr"`
+	High  int     `xml:"hi,attr"`
+	Value float64 `xml:",chardata"`
 }
 
 type AO struct {
-	Id    int `xml:"id,attr"`
-	Value int `xml:",chardata"`
+	Id    int     `xml:"id,attr"`
+	Value float64 `xml:",chardata"`
 }
 
 type AI struct {
-	Id    int `xml:"id,attr"`
-	Low   int `xml:"lo,attr"`
-	High  int `xml:"hi,attr"`
-	Value int `xml:",chardata"`
+	Id    int     `xml:"id,attr"`
+	Low   int     `xml:"lo,attr"`
+	High  int     `xml:"hi,attr"`
+	Value float64 `xml:",chardata"`
 }
 
 type Clock struct {
@@ -212,13 +227,13 @@ const (
 
 var conn *net.UDPConn // UDP Connection
 var DEBUG = false
-var POLL = true
+var POLL = false
 
 const PollingTime = 600 // seconds
 
-var Events = make(chan EventStruct, 1) // Events is our events channel which will notify calling code that we have an event happening
-var Devices = make(map[string]*Device) // All the Devices we've discovered
-var deviceCount int                    // How many items we've discovered
+var Events = make(chan EventStruct, 50) // Events is our events channel which will notify calling code that we have an event happening
+var Devices = make(map[string]*Device)  // All the Devices we've discovered
+var deviceCount int                     // How many items we've discovered
 
 var UDPPort = "2552" // UDP Port
 
@@ -232,7 +247,22 @@ var gwPORT = "8080"             // Gateway
 // ===============
 
 // Prepare is the first function you should call. Gets our UDP connection ready
-func Prepare() (bool, error) {
+func Prepare(wbdc *WebbrickDriverConfig) (bool, error) {
+
+	if wbdc != nil {
+		wbdc =
+			&WebbrickDriverConfig{
+				Name:        "PKHome-TEST",
+				Initialised: false,
+				//				NinjaLogControl: logger.GetLogger("WebBrick Local"),
+				NumberOfDevices: 0,
+				PollingMinutes:  5,
+				PollingActive:   false,
+			}
+	}
+
+	//	myLog = wbdc.NinjaLogControl
+	myLog = logger.GetLogger("WebBrick Local")
 
 	_, err := getLocalIP() // Get our local IP. Not actually used in this func, but is more of a failsafe
 	if err != nil {        // Error? Return false
@@ -277,7 +307,7 @@ func CheckForMessages() (bool, error) { // Now we're checking for messages
 
 	} else {
 
-		fmt.Println("From Us:", msg)
+		myLog.Infof("From Us:", msg)
 		msg = nil
 
 	}
@@ -294,7 +324,7 @@ func PollWBStatus(devID string) (int, error) {
 
 	if POLL {
 		for _ = range time.Tick(PollingTime * time.Second) {
-			fmt.Println("   **** Polling WBStatus & Config for ", devID)
+			myLog.Infof("   **** Polling WBStatus & Config for ", devID)
 			GetWBStatus(devID)
 		}
 	}
@@ -305,7 +335,7 @@ func PollWBStatus(devID string) (int, error) {
 // Get WB Status on Initilisation
 func GetWBStatus(devID string) (int, error) {
 
-	fmt.Println("   **** Getting WBStatus & Config for ", devID)
+	myLog.Infof("   **** Getting WBStatus & Config for ", devID)
 
 	var success int
 	var statusCommand string
@@ -325,18 +355,18 @@ func GetWBStatus(devID string) (int, error) {
 	// http call for the wb status
 	resp, err := http.Get(statusCommand) // call the http service
 	if err != nil {
-		fmt.Println("Error getting WBStatus for " + Devices[devID].IP.String())
+		myLog.Errorf("Error getting WBStatus for " + Devices[devID].IP.String())
 	}
 	defer resp.Body.Close()
 
 	respbody, err := ioutil.ReadAll(resp.Body) // read out the reponsse body
 	if err != nil {
-		fmt.Println("Empty Body in http request for " + Devices[devID].IP.String())
+		myLog.Errorf("Empty Body in http request for " + Devices[devID].IP.String())
 		return 0, err
 	} else {
 		success = 1
 	}
-	//fmt.Printf("%s \n", respbody)
+	//myLog.Debugf("%s \n", respbody)
 
 	// Decode WB Status XML encoding
 	var _wbs WebbrickStatus                   // create container to load the xml
@@ -345,18 +375,16 @@ func GetWBStatus(devID string) (int, error) {
 	decoder.CharsetReader = charset.NewReader // bind the reader to the decoder
 	xmlerr := decoder.Decode(&_wbs)           // unmarshall the xml
 	if xmlerr != nil {
-		fmt.Printf("error: %v", xmlerr)
+		myLog.Errorf("error: %v", xmlerr)
 		return 0, xmlerr
 	} else {
-		fmt.Println("      **** Got WebbrickStatus ok for ", devID)
+		myLog.Infof("      **** Got WebbrickStatus ok for ", devID)
 
 	}
 
-	//fmt.Printf("%+v\n", _wbs)
 	if DEBUG {
-		spew.Dump(_wbs)
+		myLog.Debugf(spew.Sdump(_wbs))
 	}
-
 	///////////////////////////////
 	//
 	// WB Config
@@ -366,20 +394,20 @@ func GetWBStatus(devID string) (int, error) {
 	// http call for the wb config
 	wbcresp, wbcerr := http.Get(configCommand) // call the http service
 	if wbcerr != nil {
-		fmt.Println("Error getting WBConfig for " + Devices[devID].IP.String())
+		myLog.Errorf("Error getting WBConfig for " + Devices[devID].IP.String())
 	}
 	defer wbcresp.Body.Close()
 
 	wbcrespbody, wbcerr := ioutil.ReadAll(wbcresp.Body) // read out the reponsse body
 	if wbcerr != nil {
-		fmt.Println("Empty Body in http request for " + Devices[devID].IP.String())
+		myLog.Errorf("Empty Body in http request for " + Devices[devID].IP.String())
 		success = 0
 		err = wbcerr
 		return success, wbcerr
 	} else {
 		success = 1
 	}
-	//fmt.Printf("%s \n", wbcrespbody)
+	//myLog.Debugf("%s \n", wbcrespbody)
 
 	// Decode WB Config XML encoding
 	var _wbc WebbrickConfig                      // create container to load the xml
@@ -388,22 +416,22 @@ func GetWBStatus(devID string) (int, error) {
 	wbcdecoder.CharsetReader = charset.NewReader // bind the reader to the decoder
 	wbcxmlerr := wbcdecoder.Decode(&_wbc)        // unmarshall the xml
 	if wbcxmlerr != nil {
-		fmt.Printf("error: %v", wbcxmlerr)
+		myLog.Errorf("error: %v", wbcxmlerr)
 		return 0, wbcxmlerr
 	} else {
-		fmt.Println("      **** Got WebbrickConfig ok for ", _wbc.Name)
+		myLog.Infof("      **** Got WebbrickConfig ok for ", _wbc.Name)
 		success = 1
 		//err = wbcxmlerr
 	}
-	//fmt.Printf("%+v\n", _wbc)
+
 	if DEBUG {
-		spew.Dump(_wbc)
+		myLog.Debugf(spew.Sdump(_wbc))
 	}
 
 	mapDevices, mderr := CreateBrickDevices(_wbc, _wbs)
 
 	if mderr != nil {
-		fmt.Println("error mapping devices %v", mderr)
+		myLog.Errorf("error mapping devices %v", mderr)
 		success = mapDevices
 		err = mderr
 		return 0, mderr
@@ -459,7 +487,7 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 	_ip = net.ParseIP(_wbc.IP.IPString)
 
-	fmt.Println("      **** Checking Devices for ", _wbc.Name)
+	myLog.Infof("      **** Checking Devices for ", _wbc.Name)
 
 	// Lights - AO
 	for light := range _wbs.AOs.AO {
@@ -470,12 +498,13 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 		// // Calculate the UID
 		UID := strconv.Itoa(_wbs.BrickNo) + "::AO::" + strconv.Itoa(light)
 		if !EXCLUDE[UID] {
-			if _wbs.AOs.AO[light].Value > 0 {
+			if _wbs.AOs.AO[light].Value == 0 {
 				_state = false
 				_message = _wbc.NAs.NA[light].Name + " is off"
 			} else {
 				_state = true
-				_message = _wbc.NAs.NA[light].Name + " is on at " + strconv.Itoa(_wbs.AOs.AO[light].Value) + "%"
+				_message = _wbc.NAs.NA[light].Name + " is on at " + strconv.FormatFloat(_wbs.AOs.AO[light].Value, 'f', 6, 64) + "%"
+
 			}
 
 			// Check to see if we've already got macAdd in our array
@@ -483,18 +512,19 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, "", LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.NAs.NA[light].Name, LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
 				passMessage("newlightchannelfound", *Devices[UID])
-				fmt.Println("        **** Creating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
+				myLog.Infof("        **** Creating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
 			} else {
 				Devices[UID].State = _state
+				Devices[UID].Name = _wbc.NAs.NA[light].Name
 				Devices[UID].Level = _wbs.AOs.AO[light].Value
 				Devices[UID].LastMessage = _message
 				passMessage("existinglightchannelupdated", *Devices[UID])
-				fmt.Println("        **** Updating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
+				myLog.Infof("        **** Updating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
 			}
 		} else {
-			fmt.Println("        **** Excluding Light Device for ", UID)
+			myLog.Infof("        **** Excluding Light Device for ", UID)
 
 		}
 	}
@@ -516,32 +546,34 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 				if !PIRS[UID] { // handle PIR from list, as you can't tell the difference normally
 					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
 					deviceCount++
-					Devices[UID] = &Device{deviceCount, UID, "", BUTTON, digitalIn, _ip, true, true, false, 0, _message}
+					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, BUTTON, digitalIn, _ip, true, true, false, 0, _message}
 					passMessage("newbuttonfound", *Devices[UID])
-					fmt.Println("        **** Creating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
+					myLog.Infof("        **** Creating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
 				} else {
 					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
 					deviceCount++
-					Devices[UID] = &Device{deviceCount, UID, "", PIR, digitalIn, _ip, true, true, false, 0, _message}
+					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, PIR, digitalIn, _ip, true, true, false, 0, _message}
 					passMessage("newpirfound", *Devices[UID])
-					fmt.Println("        **** Creating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
+					myLog.Infof("        **** Creating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
 
 				}
 			} else {
 				if !PIRS[UID] {
 					_message = _wbc.CDs.CD[digitalIn].Name + " has been pressed"
 					Devices[UID].LastMessage = _message
+					Devices[UID].Name = _wbc.CDs.CD[digitalIn].Name
 					passMessage("existingbuttonupdated", *Devices[UID])
-					fmt.Println("        **** Updating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
+					myLog.Infof("        **** Updating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
 				} else {
-					_message = _wbc.CDs.CD[digitalIn].Name + " has been pressed"
+					_message = _wbc.CDs.CD[digitalIn].Name + " has been triggered"
 					Devices[UID].LastMessage = _message
+					Devices[UID].Name = _wbc.CDs.CD[digitalIn].Name
 					passMessage("existingpirupdated", *Devices[UID])
-					fmt.Println("        **** Updating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
+					myLog.Infof("        **** Updating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
 				}
 			}
 		} else {
-			fmt.Println("        **** Excluding Trigger Device for ", UID)
+			myLog.Infof("        **** Excluding Trigger Device for ", UID)
 
 		}
 	}
@@ -552,7 +584,7 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 		var _message string
 
 		// // Calculate the UID
-		UID := strconv.Itoa(_wbs.BrickNo) + "::TD::" + strconv.Itoa(digitalOut)
+		UID := strconv.Itoa(_wbs.BrickNo) + "::DO::" + strconv.Itoa(digitalOut)
 
 		if !EXCLUDE[UID] {
 			// Check to see if we've already got macAdd in our array
@@ -561,17 +593,18 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
 				_message = _wbc.NOs.NO[digitalOut].Name + " state has been found"
-				Devices[UID] = &Device{deviceCount, UID, "", STATE, digitalOut, _ip, true, true, false, 0, _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.NOs.NO[digitalOut].Name, STATE, digitalOut, _ip, true, true, false, 0, _message}
 				passMessage("newoutputfound", *Devices[UID])
-				fmt.Println("        **** Creating State Device for ", UID, _wbc.NOs.NO[digitalOut])
+				myLog.Infof("        **** Creating State Device for ", UID, _wbc.NOs.NO[digitalOut])
 			} else {
 				_message = _wbc.NOs.NO[digitalOut].Name + " state has changed"
 				Devices[UID].LastMessage = _message
+				Devices[UID].Name = _wbc.NOs.NO[digitalOut].Name
 				passMessage("existingoutputupdated", *Devices[UID])
-				fmt.Println("        **** Updating State Device for ", UID, _wbc.NOs.NO[digitalOut])
+				myLog.Infof("        **** Updating State Device for ", UID, _wbc.NOs.NO[digitalOut])
 			}
 		} else {
-			fmt.Println("        **** Excluding State Device for ", UID)
+			myLog.Infof("        **** Excluding State Device for ", UID)
 
 		}
 	}
@@ -580,10 +613,10 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 	for temp := range _wbc.CTs.CT {
 
 		var _message string
-		_message = _wbc.CTs.CT[temp].Name + " temperature value is " + strconv.Itoa(_wbs.Tmps.Tmp[temp].Value)
+		_message = _wbc.CTs.CT[temp].Name + " temperature value is " + strconv.FormatFloat(_wbs.Tmps.Tmp[temp].Value, 'f', 6, 64)
 
 		// Calculate the UID
-		UID := strconv.Itoa(_wbs.BrickNo) + "::CT::" + strconv.Itoa(temp)
+		UID := strconv.Itoa(_wbs.BrickNo) + "::CT::" + strconv.FormatFloat(_wbs.Tmps.Tmp[temp].Value, 'f', 6, 64)
 
 		if !EXCLUDE[UID] {
 			// Check to see if we've already got macAdd in our array
@@ -591,17 +624,18 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, "", STATE, temp, _ip, true, true, false, _wbs.Tmps.Tmp[temp].Value, _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.CTs.CT[temp].Name, STATE, temp, _ip, true, true, false, _wbs.Tmps.Tmp[temp].Value, _message}
 				passMessage("newtempfound", *Devices[UID])
-				fmt.Println("        **** Creating Temperature Device for ", UID, _wbc.CTs.CT[temp])
+				myLog.Infof("        **** Creating Temperature Device for ", UID, _wbc.CTs.CT[temp])
 			} else {
 				Devices[UID].LastMessage = _message
+				Devices[UID].Name = _wbc.CTs.CT[temp].Name
 				passMessage("existingtempupdated", *Devices[UID])
-				fmt.Println("        **** Updating Temperature Device for ", UID, _wbc.CTs.CT[temp])
+				myLog.Infof("        **** Updating Temperature Device for ", UID, _wbc.CTs.CT[temp])
 			}
 
 		} else {
-			fmt.Println("        **** Excluding Temperature Device for ", UID)
+			myLog.Infof("        **** Excluding Temperature Device for ", UID)
 
 		}
 	}
@@ -634,7 +668,7 @@ func SetLevel(devID string, level float64) (bool, error) {
 	// Its a light
 	case LIGHT:
 		// update the record for new levels
-		Devices[devID].Level = int(level)
+		Devices[devID].Level = float64(level)
 		//var statebit string
 		if Devices[devID].Level == 0 {
 			Devices[devID].State = false
@@ -643,11 +677,10 @@ func SetLevel(devID string, level float64) (bool, error) {
 		}
 
 		// create and send the command
-		command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.Itoa(Devices[devID].Level)
+		command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.FormatFloat(Devices[devID].Level, 'f', 6, 64)
 		success, err := sendCommand(command, devID)
 
-		//success, err := sendMessage("686400176463"+macAdd+twenties+"00000000"+statebit, Devices[macAdd].IP)
-		passMessage("lightset:"+strconv.Itoa(Devices[devID].Level), *Devices[devID])
+		passMessage("lightset:"+strconv.FormatFloat(Devices[devID].Level, 'f', 6, 64), *Devices[devID])
 		command = ""
 		return success, err
 
@@ -678,11 +711,10 @@ func SetState(devID string, state bool) (bool, error) {
 		}
 
 		// create and send the command
-		command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.Itoa(Devices[devID].Level)
+		command = "http://" + Devices[devID].IP.String() + "/hid.spi?AA" + strconv.Itoa(Devices[devID].Channel) + "=" + strconv.FormatFloat(Devices[devID].Level, 'f', 6, 64)
 		success, err := sendCommand(command, devID)
 
-		//success, err := sendMessage("686400176463"+macAdd+twenties+"00000000"+statebit, Devices[macAdd].IP)
-		passMessage("lightset:"+strconv.Itoa(Devices[devID].Level), *Devices[devID])
+		passMessage("lightset:"+strconv.FormatFloat(Devices[devID].Level, 'f', 6, 64), *Devices[devID])
 		command = ""
 		return success, err
 
@@ -718,7 +750,7 @@ func GetState(devID string) bool {
 }
 
 // GetLevel gets the level of a device, given its ID
-func GetLevel(devID string) int {
+func GetLevel(devID string) float64 {
 	return Devices[devID].Level
 }
 
@@ -788,16 +820,21 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 		// index is the index where we are
 		// element is the element from someSlice for where we are
-		if DEBUG && index > 3 && resp.PacketSource != "ST" && resp.PacketSource != "AO" && resp.PacketSource != "DO" && resp.PacketSource != "TD" {
-			fmt.Println("Missing Handler for " + resp.PacketSource)
-			fmt.Println(index)
-			fmt.Printf(" : ")
-			fmt.Println((reflect.TypeOf(element)))
-			fmt.Printf(" : ")
-			fmt.Println((element))
-			fmt.Printf(" : ")
-			fmt.Println(string(element))
-			fmt.Printf("\n")
+
+		if index > 3 && resp.PacketSource != "ST" && resp.PacketSource != "AO" && resp.PacketSource != "DO" && resp.PacketSource != "TD" {
+			myLog.Errorf("Unknown Device type found : ", resp.PacketSource)
+
+			if DEBUG {
+				fmt.Println("Missing Handler for " + resp.PacketSource)
+				fmt.Println(index)
+				fmt.Printf(" : ")
+				fmt.Println((reflect.TypeOf(element)))
+				fmt.Printf(" : ")
+				fmt.Println((element))
+				fmt.Printf(" : ")
+				fmt.Println(string(element))
+				fmt.Printf("\n")
+			}
 		}
 	}
 
@@ -881,7 +918,8 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 		// Calculate the private values for the message
 		var _state bool
 		_message := "Light at level " + resp.Value
-		_value, _ := strconv.Atoi(resp.Value)
+		//_value, _ := strconv.Atoi(resp.Value)
+		_value, _ := strconv.ParseFloat(resp.Value, 64)
 		if _value > 0 {
 			_state = true
 		} else {
@@ -904,93 +942,6 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 	}
 	return true, nil
 }
-
-// handleMessage parses a message found by CheckForMessages
-// func handleWB(xml string, addr *net.UDPAddr) (bool, error) {
-
-// 	//Strip out the information sent from the brick
-// 	resp := new(WebBrickMsg)
-// 	resp.Addr = addr.IP.String()
-
-// 	UID := strconv.Itoa(resp.FromNodeNo) + "::" + resp.PacketSource + "::" + strconv.Itoa(resp.SourceChannel)
-
-// 	switch resp.PacketSource {
-// 	case "ST": // Timestamp
-
-// 		_message := "Seen at " + resp.Hour + ":" + resp.Minute + ":" + resp.Second
-
-// 		// Check to see if we've already got macAdd in our array
-// 		_, ok := Devices[UID]
-
-// 		if ok == false { // we haven't got this in our Devices array
-// 			deviceCount++
-// 			Devices[UID] = &Device{deviceCount, UID, "", HEARTBEAT, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
-// 			passMessage("newwebbrickfound", *Devices[UID])
-// 		} else {
-// 			Devices[UID].LastMessage = _message
-// 			passMessage("existingwebbrickupdated", *Devices[UID])
-// 		}
-
-// 	case "DO": // Is this PIR or is this Dig Out State, e.g. Heating, State Tracking ?
-
-// 		_message := "Trigger on " + strconv.Itoa(resp.SourceChannel)
-
-// 		// Check to see if we've already got macAdd in our array
-// 		_, ok := Devices[UID]
-
-// 		if ok == false { // we haven't got this in our Devices array
-// 			deviceCount++
-// 			Devices[UID] = &Device{deviceCount, UID, "", PIR, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
-// 			passMessage("newtriggerfound", *Devices[UID])
-// 		} else {
-// 			Devices[UID].LastMessage = _message
-// 			passMessage("existingtriggerupdated", *Devices[UID])
-// 		}
-
-// 	case "TD": // Button (?) Check is this includes PIR as well
-
-// 		_message := "Button on " + strconv.Itoa(resp.SourceChannel)
-
-// 		// Check to see if we've already got macAdd in our array
-// 		_, ok := Devices[UID]
-
-// 		if ok == false { // we haven't got this in our Devices array
-// 			deviceCount++
-// 			Devices[UID] = &Device{deviceCount, UID, "", BUTTON, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
-// 			passMessage("newbuttonfound", *Devices[UID])
-// 		} else {
-// 			Devices[UID].LastMessage = _message
-// 			passMessage("existingbuttonupdated", *Devices[UID])
-// 		}
-
-// 	case "AO": // Light Dimmer Device
-
-// 		// Calculate the private values for the message
-// 		var _state bool
-// 		_message := "Light at level " + resp.Value
-// 		_value, _ := strconv.Atoi(resp.Value)
-// 		if _value > 0 {
-// 			_state = true
-// 		} else {
-// 			_state = false
-// 		}
-
-// 		// Check to see if we've already got macAdd in our array
-// 		_, ok := Devices[UID]
-
-// 		if ok == false { // we haven't got this in our Devices array
-// 			deviceCount++
-// 			Devices[UID] = &Device{deviceCount, UID, "", LIGHT, resp.SourceChannel, addr.IP, true, false, _state, _value, _message}
-// 			passMessage("newlightchannelfound", *Devices[UID])
-// 		} else {
-// 			Devices[UID].State = _state
-// 			Devices[UID].Level = _value
-// 			Devices[UID].LastMessage = _message
-// 			passMessage("existinglightchannelupdated", *Devices[UID])
-// 		}
-// 	}
-// 	return true, nil
-// }
 
 ////////////////////////////////////
 //
@@ -1056,7 +1007,7 @@ func sendCommand(command string, devID string) (bool, error) {
 	// Dont need to read the response yet
 	// its fire and hope and forget
 	body, err := ioutil.ReadAll(resp.Body)
-	fmt.Println("**** Body Message ****", body)
+	myLog.Infof("**** Body Message ****", body)
 
 	// Looks good
 	return true, nil
