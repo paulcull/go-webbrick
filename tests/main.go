@@ -7,10 +7,24 @@ import (
 	"time" // For setInterval()
 )
 
+// No config provided? Set up some defaults
+func defaultConfig() *webbrick.WebbrickDriverConfig {
+
+	// Set the default Configuration
+	//log = logger.GetLogger(info.Name)
+	return &webbrick.WebbrickDriverConfig{
+		Name:            "PKHome",
+		Initialised:     false,
+		NumberOfDevices: 0,
+		PollingMinutes:  5,
+		PollingActive:   false,
+	}
+}
+
 func main() {
 	fmt.Println("**** Starting Test...")
-	ready, err := webbrick.Prepare() // You ready?
-	if ready == true {               // Yep! Let's do this!
+	ready, err := webbrick.Prepare(defaultConfig()) // You ready?
+	if ready == true {                              // Yep! Let's do this!
 
 		for { // Loop forever
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
