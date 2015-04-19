@@ -254,7 +254,7 @@ var EXCLUDE = map[string]bool{
 //////////////////////////////////
 
 var conn *net.UDPConn // UDP Connection
-var DEBUG = true
+var DEBUG = false
 var POLL = false
 var PollingMinutes int
 
@@ -390,6 +390,7 @@ func GetWBStatus(devID string) (int, error) {
 	resp, err := http.Get(statusCommand) // call the http service
 	if err != nil {
 		myLog.Errorf("Error getting WBStatus for " + Devices[devID].IP.String())
+		return 0, err
 	}
 	defer resp.Body.Close()
 
@@ -681,7 +682,9 @@ func SetLightLevel(devID string, level float64) (bool, error) {
 
 	// create and send the command
 
-	command = "http://" + Devices[devID].IP.String() + "/hid.spi?COM=AA" + strconv.Itoa(Devices[devID].Channel) + ";" + strconv.FormatFloat((Devices[devID].Level*100), 'f', 0, 64)
+	command = "http://" + Devices[devID].IP.String() + "/hid.spi?com=%3A&com=AA" + strconv.Itoa(Devices[devID].Channel) + "%3B" + strconv.FormatFloat((Devices[devID].Level*100), 'f', 0, 64) + "&com=%3A"
+
+	// http://192.168.1.249/hid.spi?com=%3A&com=AA0%3B85&com=%3A
 
 	myLog.Debugf("++++++++++++ in SetLevel for LIGHT with %s ++++++++++++\n", command)
 	success, err := sendCommand(command, devID)
@@ -711,7 +714,11 @@ func SetState(devID string, state bool) (bool, error) {
 	// Convert state to the webbrick, and override the level if it's a light
 	if state {
 		_wbstate = "N" // On
-		_level = Devices[devID].Level
+		if Devices[devID].Level == 0 {
+			_level = 0.95
+		} else {
+			_level = Devices[devID].Level
+		}
 	} else {
 		_wbstate = "F" // Off
 		_level = 0
@@ -720,7 +727,8 @@ func SetState(devID string, state bool) (bool, error) {
 	// if the state is on a light device then check and set the light level
 	if Devices[devID].Type == LIGHT {
 		// create and send the command
-		command = "http://" + Devices[devID].IP.String() + "/hid.spi?COM=AA" + strconv.Itoa(Devices[devID].Channel) + ";" + strconv.FormatFloat((_level*100), 'f', 0, 64)
+		command = "http://" + Devices[devID].IP.String() + "/hid.spi?com=%3A&com=AA" + strconv.Itoa(Devices[devID].Channel) + "%3B" + strconv.FormatFloat((_level*100), 'f', 0, 64) + "&com=%3A"
+
 		myLog.Debugf("++++++++++++ in SetState for Level on %s with %s ++++++++++++\n", devID, command)
 		success, err := sendCommand(command, devID)
 		if err != nil {
@@ -733,7 +741,8 @@ func SetState(devID string, state bool) (bool, error) {
 	} else {
 
 		// create and send the command
-		command = "http://" + Devices[devID].IP.String() + "/hid.spi?COM=DO" + strconv.Itoa(Devices[devID].Channel) + ";" + _wbstate
+		command = "http://" + Devices[devID].IP.String() + "/hid.spi?com=%3A&com=DO" + strconv.Itoa(Devices[devID].Channel) + "%3B" + _wbstate + "&com=%3A"
+
 		myLog.Debugf("++++++++++++ in SetState for State on %s with %s ++++++++++++\n", devID, command)
 		success, err := sendCommand(command, devID)
 		if err != nil {
@@ -756,7 +765,8 @@ func PushButton(devID string) (bool, error) {
 	var command string
 
 	// create and send the command
-	command = "http://" + Devices[devID].IP.String() + "/hid.spi?COM=DI" + strconv.Itoa(Devices[devID].Channel)
+	command = "http://" + Devices[devID].IP.String() + "/hid.spi?com=%3A&com=DI" + strconv.Itoa(Devices[devID].Channel) + "&com=%3A"
+
 	myLog.Debugf("Push button ", command)
 
 	myLog.Debugf("++++++++++++ in PushButton and going to send %s ++++++++++++\n", command)
@@ -849,7 +859,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 		// index is the index where we are
 		// element is the element from someSlice for where we are
 
-		if index > 3 && resp.PacketSource != "ST" && resp.PacketSource != "AO" && resp.PacketSource != "DO" && resp.PacketSource != "TD" {
+		if index > 3 && resp.PacketSource != "ST" && resp.PacketSource != "CT" && resp.PacketSource != "AO" && resp.PacketSource != "DO" && resp.PacketSource != "TD" {
 			myLog.Errorf("Unknown Device type found : ", resp.PacketSource)
 
 			if DEBUG {
