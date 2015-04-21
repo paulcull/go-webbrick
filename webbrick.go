@@ -4,22 +4,22 @@ package webbrick
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset"   // For XML conversion
-	_ "code.google.com/p/go-charset/data"    // Specs for dataset conversion
-	"encoding/xml"                           // For XML work
-	"errors"                                 // For crafting our own errors
-	"fmt"                                    // For outputting stuff
-	"github.com/davecgh/go-spew/spew"        // For neatly outputting stuff
-	"github.com/ninjasphere/go-ninja/logger" // to support Ninjasphere logging if passed
-	"io/ioutil"                              // HTTP body response processing
-	"net"                                    // For networking stuff - for UDP
-	"net/http"                               // For web http calls
-	"reflect"                                // Type Get
-	"strconv"                                // For String construction
-	"time"                                   // For Poller
+	"code.google.com/p/go-charset/charset" // For XML conversion
+	_ "code.google.com/p/go-charset/data"  // Specs for dataset conversion
+	"encoding/xml"                         // For XML work
+	"errors"                               // For crafting our own errors
+	"fmt"                                  // For outputting stuff
+	"github.com/davecgh/go-spew/spew"      // For neatly outputting stuff
+	"github.com/juju/loggo"                //  logging
+	"io/ioutil"                            // HTTP body response processing
+	"net"                                  // For networking stuff - for UDP
+	"net/http"                             // For web http calls
+	"reflect"                              // Type Get
+	"strconv"                              // For String construction
+	"time"                                 // For Poller
 )
 
-var myLog = logger.GetLogger("WebBrick")
+var myLog = loggo.GetLogger("Webbrick")
 
 // EventStruct is our equivalent to node.js's Emitters, of sorts.
 // This basically passes back to our Event channel, info about what event was raised
@@ -294,7 +294,7 @@ func Prepare(wbdc *WebbrickDriverConfig) (bool, error) {
 	//PollingMinutes = wbdc.PollingMinutes
 
 	//	myLog = wbdc.NinjaLogControl
-	myLog = logger.GetLogger("WebBrick Local")
+	//myLog = loggo.GetLogger("WebBrick Local")
 
 	_, err := getLocalIP() // Get our local IP. Not actually used in this func, but is more of a failsafe
 	if err != nil {        // Error? Return false
