@@ -16,6 +16,7 @@ import (
 	"net/http"                             // For web http calls
 	"reflect"                              // Type Get
 	"strconv"                              // For String construction
+	"strings"                              // for Upper case conversion
 	"time"                                 // For Poller
 )
 
@@ -224,12 +225,12 @@ var PIRS = map[string]bool{
 	"2::TD::0":  true,
 	"2::TD::2":  true,
 	"2::TD::11": true,
+	"2::TD::1":  true,
 }
 
 // Setup some lists for Devices on the webbricks that aren't in use
 var EXCLUDE = map[string]bool{
 	"2::DO::1": true, "2::DO::2": true, "2::DO::3": true, "2::DO::4": true, "2::DO::5": true, "2::DO::6": true, "2::DO::7": true,
-	"2::TD::1": true,
 	"2::AO::1": true,
 	"2::CT::3": true, "2::CT::4": true,
 	"3::DO::0": true, "3::DO::1": true, "3::DO::2": true, "3::DO::3": true, "3::DO::4": true, "3::DO::5": true, "3::DO::6": true, "3::DO::7": true,
@@ -859,11 +860,13 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 		// index is the index where we are
 		// element is the element from someSlice for where we are
 
-		if index > 3 && resp.PacketSource != "ST" && resp.PacketSource != "CT" && resp.PacketSource != "AO" && resp.PacketSource != "DO" && resp.PacketSource != "TD" {
-			myLog.Errorf("Unknown Device type found : ", resp.PacketSource)
+		_checkSource := strings.ToUpper(resp.PacketSource)
+
+		if index > 3 && _checkSource != "ST" && _checkSource != "CT" && _checkSource != "AO" && _checkSource != "DO" && _checkSource != "TD" {
+			myLog.Errorf("Unknown Device type found : ", resp.PacketSource, _checkSource)
 
 			if DEBUG {
-				fmt.Println("Missing Handler for " + resp.PacketSource)
+				fmt.Println("Missing Handler for " + resp.PacketSource + "(" + _checkSource + ")")
 				fmt.Println(index)
 				fmt.Printf(" : ")
 				fmt.Println((reflect.TypeOf(element)))
