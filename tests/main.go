@@ -22,11 +22,13 @@ func defaultConfig() *webbrick.WebbrickDriverConfig {
 }
 
 func main() {
-	fmt.Println("**** Starting Test...")
+	fmt.Println("**** Starting Test...1")
 	ready, err := webbrick.Prepare(defaultConfig()) // You ready?
-	if ready == true {                              // Yep! Let's do this!
-
+	fmt.Println("**** Starting Test...2")
+	if ready == true { // Yep! Let's do this!
+		fmt.Println("**** Starting Test...3")
 		for { // Loop forever
+			fmt.Println("**** Starting Test...4")
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
 			case msg := <-webbrick.Events:
 				fmt.Println(" **** Event for ", msg.Name, "received...")

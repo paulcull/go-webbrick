@@ -810,6 +810,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 	//Strip out the information sent from the brick
 	resp := new(WebBrickMsg)
 	resp.Addr = addr.IP.String()
+	//resp.PacketSource = strings.ToUpper(resp.PacketSource)
 
 	for index, element := range buf {
 		switch index {
@@ -848,7 +849,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 			default:
 			}
 		case 11:
-			switch resp.PacketSource {
+			switch strings.ToUpper(resp.PacketSource) {
 			case "AO", "AI":
 				resp.Value = strconv.Itoa(int(element))
 			default:
@@ -903,9 +904,11 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 		fmt.Print("\n")
 	}
 
-	UID := strconv.Itoa(resp.FromNodeNo) + "::" + resp.PacketSource + "::" + strconv.Itoa(resp.SourceChannel)
+	UID := strconv.Itoa(resp.FromNodeNo) + "::" + strings.ToUpper(resp.PacketSource) + "::" + strconv.Itoa(resp.SourceChannel)
 
-	switch resp.PacketSource {
+	myLog.Infof(UID + " seen ")
+
+	switch strings.ToUpper(resp.PacketSource) {
 	case "ST": // Timestamp
 
 		_message := "Seen at " + resp.Hour + ":" + resp.Minute + ":" + resp.Second
