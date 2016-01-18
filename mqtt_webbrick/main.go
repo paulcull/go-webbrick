@@ -114,7 +114,7 @@ func main() {
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
 			case msg := <-webbrick.Events:
 				fmt.Println(" **** Event for ", msg.Name, "received from... ", msg.DeviceInfo.IP.String())
-				strMsg := fmt.Sprintf("%v", msg)
+				strMsg := fmt.Sprintf("%+v", msg)
 				//fmt.Println(strMsg)
 				//sent, err := publishMessage(cli, "webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
 				sent, err := publishMessage("webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
