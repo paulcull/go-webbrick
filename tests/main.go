@@ -31,6 +31,7 @@ func main() {
 			fmt.Println("**** Starting Test...4")
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
 			case msg := <-webbrick.Events:
+				fmt.Println("**** Starting Test...5")
 				fmt.Println(" **** Event for ", msg.Name, "received...")
 				switch msg.Name {
 				case "existinglightchannelfound":

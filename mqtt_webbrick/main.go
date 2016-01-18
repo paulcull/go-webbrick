@@ -35,8 +35,9 @@ func main() {
 	//sigc := make(chan os.Signal, 1)
 	//signal.Notify(sigc, os.Interrupt, os.Kill)
 
-	// Create an MQTT Client.
-	cli := client.New(&client.Options{
+	// Create an MQTT Subscribe Client.
+	fmt.Println("Setting up mqtt client...")
+	s_cli := client.New(&client.Options{
 		// Define the processing of the error handler.
 		ErrorHandler: func(err error) {
 			fmt.Println(err)
@@ -44,22 +45,26 @@ func main() {
 	})
 
 	// Terminate the Client.
-	defer cli.Terminate()
+	//defer cli.Terminate()
 
 	// Connect to the MQTT Server.
-	err := cli.Connect(&client.ConnectOptions{
-		Network: "tcp",
-		Address: "auto-openhab-n1.lan:1883",
-		//Address:  "iot.eclipse.org:1883",
+	fmt.Println("Setting up mqtt client...Connecting...")
+	err := s_cli.Connect(&client.ConnectOptions{
+		Network:  "tcp",
+		Address:  "auto-openhab-n1.lan:1883",
 		ClientID: []byte("openHAB"),
-		//ClientID: []byte("example-client"),
 	})
 	if err != nil {
+		fmt.Println(err)
 		panic(err)
+	} else {
+		fmt.Println("Setting up mqtt client...Connecting...done")
 	}
 
 	// Subscribe to topics.
-	err = cli.Subscribe(&client.SubscribeOptions{
+	fmt.Println("Setting up mqtt client...Subscribing...")
+
+	err = s_cli.Subscribe(&client.SubscribeOptions{
 		SubReqs: []*client.SubReq{
 			&client.SubReq{
 				TopicFilter: []byte("#"),
@@ -81,75 +86,51 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Setting up mqtt client...Subscribing...done")
 
-	// Publish a message.
-	// err = cli.Publish(&client.PublishOptions{
-	// 	QoS:       mqtt.QoS0,
-	// 	TopicName: []byte("bar/baz"),
-	// 	Message:   []byte("testMessage"),
+	// Unsubscribe from topics.
+	// err = cli.Unsubscribe(&client.UnsubscribeOptions{
+	// 	TopicFilters: [][]byte{
+	// 		[]byte("foo"),
+	// 	},
 	// })
 	// if err != nil {
 	// 	panic(err)
 	// }
 
-	// Unsubscribe from topics.
-	err = cli.Unsubscribe(&client.UnsubscribeOptions{
-		TopicFilters: [][]byte{
-			[]byte("foo"),
-		},
-	})
-	if err != nil {
+	// Wait for receiving a signal.
+	//<-sigc
+
+	//Disconnect the Network Connection.
+	fmt.Println("******** Setting up mqtt client...Dis-connecting...")
+	if err := s_cli.Disconnect(); err != nil {
 		panic(err)
 	}
+	fmt.Println("Setting up mqtt client...Dis-connecting...done")
 
 	ready, err := webbrick.Prepare(defaultConfig()) // You ready?
 	if ready == true {                              // Yep! Let's do this!
 		for { // Loop forever
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
 			case msg := <-webbrick.Events:
-				fmt.Println(" **** Event for ", msg.Name, "received...")
-				strMsg := fmt.Sprintf("%#v", msg)
-				fmt.Println(strMsg)
-				sent, err := publishMessage(cli, msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
-				if err != nil {
-					fmt.Println("Error in publishMessage")
-					panic(err)
+				fmt.Println(" **** Event for ", msg.Name, "received from... ", msg.DeviceInfo.IP.String())
+				strMsg := fmt.Sprintf("%v", msg)
+				//fmt.Println(strMsg)
+				//sent, err := publishMessage(cli, "webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
+				sent, err := publishMessage("webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
+				if err != nil && sent == false {
+					fmt.Println(" !!!!!!!!!!!!!!!!! Error in publishMessage")
+					//panic(err)
 				}
-				fmt.Println(sent)
-				//publishMessage(cli, msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
-				switch msg.Name {
-				case "existinglightchannelfound":
-					fmt.Println("  **** "+msg.Name+" Webbrick updated - DEV ID is ", msg.DeviceInfo.DevID, " value of ", strconv.Itoa(int(msg.DeviceInfo.Level)))
-				case "existingwebbrickupdated", "existingtriggerupdated", "existingbuttonupdated":
-					fmt.Println("  **** "+msg.Name+" Webbrick updated! DEV ID is", msg.DeviceInfo.DevID)
-					//fallthrough
-				case "newlightchannelfound":
-					fmt.Println("  **** "+msg.Name+" Webbrick found! DEV ID is ", msg.DeviceInfo.DevID, " value of ", strconv.Itoa(int(msg.DeviceInfo.Level)))
-				case "newwebbrickfound", "newtriggerfound", "newbuttonfound":
-					fmt.Println("  **** "+msg.Name+" Webbrick found! DEV ID is", msg.DeviceInfo.DevID)
-					webbrick.PollWBStatus(msg.DeviceInfo.DevID)
-				case "queried":
-					// fmt.Println("We've queried. Name is:", msg.DeviceInfo.Name)
-					// webbrick.SetState(msg.DeviceInfo.DevID, true)
-					// time.Sleep(time.Second)
-					// webbrick.SetState(msg.DeviceInfo.DevID, false)
-				case "statechanged":
-					fmt.Println("State changed to", msg.DeviceInfo.State)
-				}
+				//fmt.Println(sent)
+
 			default:
 				webbrick.CheckForMessages()
 			}
-			// Wait for receiving a signal.
-			//<-sigc
-
-			// Disconnect the Network Connection.
-			// if err := cli.Disconnect(); err != nil {
-			// 	panic(err)
-			// }
 
 		}
-		fmt.Println(" **** List of Devices ****")
-		webbrick.ListDevices()
+		//fmt.Println(" **** List of Devices ****")
+		//webbrick.ListDevices()
 	} else {
 		fmt.Println("Error:", err)
 	}
@@ -164,28 +145,63 @@ func main() {
 
 }
 
-func publishMessage(cli *client.Client, message string, topic string) (bool, error) {
+//func publishMessage(cli *client.Client, message string, topic string) (bool, error) {
+func publishMessage(message string, topic string) (bool, error) {
 
-	var err error
+	// Create an MQTT Client.
+	fmt.Println("Setting up mqtt client publish...")
+	p_cli := client.New(&client.Options{
+		// Define the processing of the error handler.
+		ErrorHandler: func(err error) {
+			fmt.Println(err)
+		},
+	})
 
-	fmt.Println(" **** Called in publisher ****")
+	// Terminate the Client.
+	defer p_cli.Terminate()
+
+	// Connect to the MQTT Server.
+	fmt.Println("Setting up mqtt client publish...Connecting...")
+	err := p_cli.Connect(&client.ConnectOptions{
+		Network:  "tcp",
+		Address:  "auto-openhab-n1.lan:1883",
+		ClientID: []byte("openHAB"),
+	})
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	} else {
+		fmt.Println("Setting up mqtt client publish...Connecting...done")
+	}
 
 	// check that we have the topic set
 	if topic == "" {
 		topic = "webbrick"
 	}
 	//publish
-	fmt.Println(" **** try to publish ****")
-	err = cli.Publish(&client.PublishOptions{
+	fmt.Println("Setting up mqtt client publish...Publishing...")
+	err = p_cli.Publish(&client.PublishOptions{
 		QoS:       mqtt.QoS0,
 		TopicName: []byte(topic),
 		Message:   []byte(message),
 	})
 	//check for err
 	if err != nil {
+		fmt.Println(" **** error in trying to publish ****")
+		fmt.Println(topic)
+		fmt.Println(message)
+		fmt.Println(" **** error in trying to publish ****")
 		return false, err
+		//panic(err)
+	}
+	fmt.Println("Setting up mqtt client publish...Publishing...done")
+
+	fmt.Println("Setting up mqtt client publish...Dis-connecting...")
+	if err := p_cli.Disconnect(); err != nil {
 		panic(err)
 	}
+	fmt.Println("Setting up mqtt client publish...Dis-connecting...done")
+
 	//true status
 	return true, nil
 }
