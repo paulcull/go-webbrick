@@ -120,7 +120,7 @@ func main() {
 				strMsg := string(strMsgJSON)
 				fmt.Println(strMsg)
 				//sent, err := publishMessage(cli, "webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
-				sent, err := publishMessage("webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
+				sent, err := publishMessage(strMsg, "webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID)
 				if err != nil && sent == false {
 					fmt.Println(" !!!!!!!!!!!!!!!!! Error in publishMessage")
 					//panic(err)
