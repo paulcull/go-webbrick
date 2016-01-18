@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt" // For outputting messages
+	"encoding/json" // json encoding
+	"fmt"           // For outputting messages
 	//"os"        // For OS Interaction
 	//"os/signal" // For picking up the signal
 
@@ -114,8 +115,10 @@ func main() {
 			select { // This lets us do non-blocking channel reads. If we have a message, process it. If not, check for UDP data and loop
 			case msg := <-webbrick.Events:
 				fmt.Println(" **** Event for ", msg.Name, "received from... ", msg.DeviceInfo.IP.String())
-				strMsg := fmt.Sprintf("%+v", msg)
-				//fmt.Println(strMsg)
+				//strMsg := fmt.Sprintf("%+v", msg)
+				strMsgJSON, _ := json.Marshal(msg)
+				strMsg := string(strMsgJSON)
+				fmt.Println(strMsg)
 				//sent, err := publishMessage(cli, "webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
 				sent, err := publishMessage("webbrick/"+strconv.Itoa(msg.DeviceInfo.ID)+"/"+msg.Name+"/"+msg.DeviceInfo.DevID, strMsg)
 				if err != nil && sent == false {
@@ -169,7 +172,8 @@ func publishMessage(message string, topic string) (bool, error) {
 	})
 	if err != nil {
 		fmt.Println(err)
-		panic(err)
+		return false, err
+		//panic(err)
 	} else {
 		fmt.Println("Setting up mqtt client publish...Connecting...done")
 	}
@@ -199,6 +203,7 @@ func publishMessage(message string, topic string) (bool, error) {
 	fmt.Println("Setting up mqtt client publish...Dis-connecting...")
 	if err := p_cli.Disconnect(); err != nil {
 		panic(err)
+		return false, err
 	}
 	fmt.Println("Setting up mqtt client publish...Dis-connecting...done")
 
