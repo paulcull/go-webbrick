@@ -69,3 +69,8 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+mqtt_webbrick/mqtt_webbrick
+mqtt_webbrick_test
+
+mqtt_webbrick/mqtt_webbrick
