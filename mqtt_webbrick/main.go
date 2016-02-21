@@ -126,7 +126,11 @@ func main() {
 				sent, err := publishMessage(cli, strMsg, "webbrick/from/"+
 					strconv.Itoa(msg.DeviceInfo.Channel)+
 					"/"+
-					msg.DeviceInfo.DevID)
+					strconv.Itoa(msg.DeviceInfo.Type)+
+					"/"+
+					msg.DeviceInfo.DevID+
+					"/"+
+					strconv.FormatBool(msg.DeviceInfo.State))
 				if err != nil && sent == false {
 					fmt.Println(" !!!!!!!!!!!!!!!!! Error in publishMessage")
 					panic(err)
@@ -159,6 +163,7 @@ func actOnMessage(topicName, message []byte) {
 	fmt.Println(inboundDev)
 	fmt.Println(string(message))
 	fmt.Println(" **************************** in actOnMessage ***")
+
 }
 
 func publishMessage(cli *client.Client, message string, topic string) (bool, error) {

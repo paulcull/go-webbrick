@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"                             // For outputting messages
-	"github.com/paulcull/go-webbrick" // For controlling Orvibo stuff
+	"github.com/paulcull/go-webbrick" // For controlling webbrick stuff
 	"strconv"
 	"time" // For setInterval()
 )
