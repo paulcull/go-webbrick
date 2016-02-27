@@ -47,6 +47,7 @@ type Device struct {
 	ID          int     // The ID of our device
 	DevID       string  // The full Device ID
 	Name        string  // The name of our item
+	BrickID     int     // The ID for the brick unit
 	Type        int     // What type of device this is. See the const below for valid types
 	Channel     int     // Which Device Channel
 	IP          net.IP  // The IP address of our item
@@ -521,7 +522,7 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, _wbc.NAs.NA[light].Name, LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.NAs.NA[light].Name, _wbs.BrickNo, LIGHT, _wbs.AOs.AO[light].Id, _ip, true, true, _state, _wbs.AOs.AO[light].Value, _message}
 				passMessage("newlightchannelfound", *Devices[UID])
 				myLog.Infof("        **** Creating Light Device for ", UID, _wbs.AOs.AO[light], _wbc.NAs.NA[light])
 			} else {
@@ -555,13 +556,13 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 				if !PIRS[UID] { // handle PIR from list, as you can't tell the difference normally
 					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
 					deviceCount++
-					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, BUTTON, digitalIn, _ip, true, true, false, 0, _message}
+					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, _wbs.BrickNo, BUTTON, digitalIn, _ip, true, true, false, 0, _message}
 					passMessage("newbuttonfound", *Devices[UID])
 					myLog.Infof("        **** Creating Button Device for ", UID, _wbc.CDs.CD[digitalIn])
 				} else {
 					_message = _wbc.CDs.CD[digitalIn].Name + " has been found"
 					deviceCount++
-					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, PIR, digitalIn, _ip, true, true, false, 0, _message}
+					Devices[UID] = &Device{deviceCount, UID, _wbc.CDs.CD[digitalIn].Name, _wbs.BrickNo, PIR, digitalIn, _ip, true, true, false, 0, _message}
 					passMessage("newpirfound", *Devices[UID])
 					myLog.Infof("        **** Creating PIR Device for ", UID, _wbc.CDs.CD[digitalIn])
 				}
@@ -601,7 +602,7 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
 				_message = _wbc.NOs.NO[digitalOut].Name + " state has been found"
-				Devices[UID] = &Device{deviceCount, UID, _wbc.NOs.NO[digitalOut].Name, STATE, digitalOut, _ip, true, true, false, 0, _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.NOs.NO[digitalOut].Name, _wbs.BrickNo, STATE, digitalOut, _ip, true, true, false, 0, _message}
 				passMessage("newoutputfound", *Devices[UID])
 				myLog.Infof("        **** Creating State Device for ", UID, _wbc.NOs.NO[digitalOut])
 			} else {
@@ -632,7 +633,7 @@ func CreateBrickDevices(_wbc WebbrickConfig, _wbs WebbrickStatus) (int, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, _wbc.CTs.CT[temp].Name, TEMP, temp, _ip, true, true, false, (_wbs.Tmps.Tmp[temp].Value / 16), _message}
+				Devices[UID] = &Device{deviceCount, UID, _wbc.CTs.CT[temp].Name, _wbs.BrickNo, TEMP, temp, _ip, true, true, false, (_wbs.Tmps.Tmp[temp].Value / 16), _message}
 				passMessage("newtempfound", *Devices[UID])
 				myLog.Infof("        **** Creating Temperature Device for ", UID, _wbc.CTs.CT[temp])
 			} else {
@@ -918,7 +919,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 		if ok == false { // we haven't got this in our Devices array
 			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", HEARTBEAT, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
+			Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, HEARTBEAT, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
 			passMessage("newwebbrickfound", *Devices[UID])
 		} else {
 			Devices[UID].LastMessage = _message
@@ -934,7 +935,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 		if ok == false { // we haven't got this in our Devices array
 			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", PIR, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
+			Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, PIR, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
 			passMessage("newtriggerfound", *Devices[UID])
 		} else {
 			Devices[UID].LastMessage = _message
@@ -952,7 +953,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 		if ok == false { // we haven't got this in our Devices array
 			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", TEMP, resp.SourceChannel, addr.IP, true, false, false, _value / 16, _message}
+			Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, TEMP, resp.SourceChannel, addr.IP, true, false, false, _value / 16, _message}
 			passMessage("newtempfound", *Devices[UID])
 		} else {
 			Devices[UID].LastMessage = _message
@@ -970,7 +971,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, "", BUTTON, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
+				Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, BUTTON, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
 				passMessage("newbuttonfound", *Devices[UID])
 			} else {
 				Devices[UID].LastMessage = _message
@@ -984,7 +985,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 			if ok == false { // we haven't got this in our Devices array
 				deviceCount++
-				Devices[UID] = &Device{deviceCount, UID, "", PIR, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
+				Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, PIR, resp.SourceChannel, addr.IP, true, false, false, 0, _message}
 				passMessage("newpirfound", *Devices[UID])
 			} else {
 				Devices[UID].LastMessage = _message
@@ -1012,7 +1013,7 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
 		if ok == false { // we haven't got this in our Devices array
 			deviceCount++
-			Devices[UID] = &Device{deviceCount, UID, "", LIGHT, resp.SourceChannel, addr.IP, true, false, _state, _value, _message}
+			Devices[UID] = &Device{deviceCount, UID, "", resp.FromNodeNo, LIGHT, resp.SourceChannel, addr.IP, true, false, _state, _value, _message}
 			passMessage("newlightchannelfound", *Devices[UID])
 		} else {
 			Devices[UID].State = _state

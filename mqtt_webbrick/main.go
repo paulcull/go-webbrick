@@ -81,7 +81,7 @@ func main() {
 			panic(err)
 		}
 	}
-	heartbeat := setInterval(ping, 5*time.Second)
+	heartbeat := setInterval(ping, 59*time.Second)
 
 	////////////////////
 	// catch the exit signal and tidy up connections cleanly
@@ -124,9 +124,13 @@ func main() {
 				strMsg := string(strMsgJSON)
 				fmt.Println(strMsg)
 				sent, err := publishMessage(cli, strMsg, "webbrick/from/"+
-					strconv.Itoa(msg.DeviceInfo.Channel)+
+					strconv.Itoa(msg.DeviceInfo.BrickID)+ //Brick Node
 					"/"+
-					strconv.Itoa(msg.DeviceInfo.Type)+
+					// msg.DeviceInfo.Name+ //
+					// "/"+
+					strconv.Itoa(msg.DeviceInfo.Type)+ // Type ID
+					"/"+
+					strconv.Itoa(msg.DeviceInfo.Channel)+ // type channel
 					"/"+
 					msg.DeviceInfo.DevID+
 					"/"+
