@@ -10,6 +10,7 @@ import (
 	"os/signal"                         // For picking up the signal
 	"strconv"
 	"strings"
+	"syscall" // Pick up for when running as systemctl service
 	"time"
 )
 
@@ -49,7 +50,7 @@ func main() {
 	////////////////////
 	// Set up channel on which to send signal notifications.
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, os.Kill)
+	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	////////////////////
 	//Create an MQTT Subscribe Client.
@@ -122,19 +123,22 @@ func main() {
 				fmt.Println(" **** Event for ", msg.Name, "received from... ", msg.DeviceInfo.IP.String())
 				strMsgJSON, _ := json.Marshal(msg)
 				strMsg := string(strMsgJSON)
+				_msg := ""
 				fmt.Println(strMsg)
-				sent, err := publishMessage(cli, strMsg, "webbrick/from/"+
+				if msg.DeviceInfo.Level > 0 {
+					_msg = strconv.FormatFloat(msg.DeviceInfo.Level, 'G', -1, 32)
+				} else {
+					_msg = strconv.FormatBool(msg.DeviceInfo.State)
+				}
+				//sent, err := publishMessage(cli, strMsg, "webbrick/from/"+
+				sent, err := publishMessage(cli, _msg, "webbrick/from/"+
 					strconv.Itoa(msg.DeviceInfo.BrickID)+ //Brick Node
 					"/"+
-					// msg.DeviceInfo.Name+ //
-					// "/"+
 					strconv.Itoa(msg.DeviceInfo.Type)+ // Type ID
 					"/"+
 					strconv.Itoa(msg.DeviceInfo.Channel)+ // type channel
 					"/"+
-					msg.DeviceInfo.DevID+
-					"/"+
-					strconv.FormatBool(msg.DeviceInfo.State))
+					msg.DeviceInfo.DevID)
 				if err != nil && sent == false {
 					fmt.Println(" !!!!!!!!!!!!!!!!! Error in publishMessage")
 					panic(err)
