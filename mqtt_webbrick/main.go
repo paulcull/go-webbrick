@@ -126,7 +126,7 @@ func main() {
 				strMsg := string(strMsgJSON)
 				_msg := ""
 				fmt.Println(strMsg)
-				if msg.DeviceInfo.Level > 0 {
+				if msg.DeviceInfo.Level > 0 || msg.DeviceInfo.Type == 3 {
 					_msg = strconv.FormatFloat(msg.DeviceInfo.Level, 'G', -1, 32)
 				} else {
 					_msg = strconv.FormatBool(msg.DeviceInfo.State)

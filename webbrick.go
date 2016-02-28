@@ -808,6 +808,8 @@ func GetLastMessage(devID string) string {
 // handleMessage parses a message found by CheckForMessages
 func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 
+	var _tmpValue = 0
+
 	//Strip out the information sent from the brick
 	resp := new(WebBrickMsg)
 	resp.Addr = addr.IP.String()
@@ -851,8 +853,15 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 			}
 		case 11:
 			switch strings.ToUpper(resp.PacketSource) {
-			case "AO", "AI":
+			case "AO", "AI", "CT":
 				resp.Value = strconv.Itoa(int(element))
+				_tmpValue = int(element)
+			default:
+			}
+		case 12:
+			switch strings.ToUpper(resp.PacketSource) {
+			case "CT":
+				resp.Value = strconv.Itoa(int(element) + _tmpValue)
 			default:
 			}
 		default:
@@ -863,6 +872,18 @@ func handleMessage(buf []byte, addr *net.UDPAddr) (bool, error) {
 		// element is the element from someSlice for where we are
 
 		_checkSource := strings.ToUpper(resp.PacketSource)
+
+		if DEBUG {
+			fmt.Println(" Handler for " + resp.PacketSource + "(" + _checkSource + ")")
+			fmt.Println(index)
+			fmt.Printf(" : ")
+			fmt.Println((reflect.TypeOf(element)))
+			fmt.Printf(" : ")
+			fmt.Println((element))
+			fmt.Printf(" : ")
+			fmt.Println(string(element))
+			fmt.Printf("\n")
+		}
 
 		if index > 3 && _checkSource != "ST" && _checkSource != "CT" && _checkSource != "AO" && _checkSource != "DO" && _checkSource != "TD" {
 			myLog.Errorf("Unknown Device type found : ", resp.PacketSource, _checkSource)
