@@ -50,7 +50,8 @@ func main() {
 	////////////////////
 	// Set up channel on which to send signal notifications.
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(sigc, os.Interrupt, os.Kill,
+		syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
 
 	////////////////////
 	//Create an MQTT Subscribe Client.
