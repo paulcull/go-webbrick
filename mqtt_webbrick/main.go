@@ -137,9 +137,9 @@ func main() {
 					"/"+
 					strconv.Itoa(msg.DeviceInfo.Type)+ // Type ID
 					"/"+
-					strconv.Itoa(msg.DeviceInfo.Channel)+ // type channel
-					"/"+
-					msg.DeviceInfo.DevID)
+					strconv.Itoa(msg.DeviceInfo.Channel)) //+ // type channel
+				// "/"+
+				// msg.DeviceInfo.DevID)
 				if err != nil && sent == false {
 					fmt.Println(" !!!!!!!!!!!!!!!!! Error in publishMessage")
 					panic(err)
