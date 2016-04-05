@@ -4,8 +4,8 @@ package webbrick
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset" // For XML conversion
-	_ "code.google.com/p/go-charset/data"  // Specs for dataset conversion
+	"github.com/paulrosania/go-charset/charset" // For XML conversion
+	_ "github.com/paulrosania/go-charset/data"  // Specs for dataset conversion
 	"encoding/xml"                         // For XML work
 	"errors"                               // For crafting our own errors
 	"fmt"                                  // For outputting stuff
