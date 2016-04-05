@@ -6,7 +6,7 @@ RUN apt-get -qy update && apt-get -qy install vim-common gcc mercurial superviso
 WORKDIR    /go/src/github.com/paulcull/go-webbrick
 ADD        . /go/src/github.com/paulcull/go-webbrick
 
-ADD etc/supervisord.conf /app/etc/
+ADD etc/supervisor.conf /app/etc/supervisord.conf
   
 RUN        go get -v
 
