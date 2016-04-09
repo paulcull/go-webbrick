@@ -17,4 +17,6 @@ RUN  go build -ldflags " \
        -X main.buildDate     $(date +%Y%m%d-%H:%M:%S) \
        -X main.goVersion     $GOLANG_VERSION \
      "
-RUN supervisord -c /etc/supervisord/supervisord.conf
+
+EXPOSE 9001
+CMD ["/usr/bin/supervisord -c /etc/supervisord/supervisord.conf"]
