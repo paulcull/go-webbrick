@@ -6,9 +6,9 @@ RUN apt-get -qy update && apt-get -qy install vim-common gcc mercurial superviso
 WORKDIR    /go/src/github.com/paulcull/go-webbrick
 ADD        . /go/src/github.com/paulcull/go-webbrick
 
-ADD etc/supervisor.conf /app/etc/supervisord.conf
+ADD etc/supervisor.conf /etc/supervisord/supervisord.conf
   
-RUN        go get -v
+RUN  go get -v
 
 RUN  go build -ldflags " \
        -X main.buildVersion  $(grep "const Version " version.go | sed -E 's/.*"(.+)"$/\1/' ) \
@@ -17,3 +17,4 @@ RUN  go build -ldflags " \
        -X main.buildDate     $(date +%Y%m%d-%H:%M:%S) \
        -X main.goVersion     $GOLANG_VERSION \
      "
+RUN supervisord -c /etc/supervisord/supervisord.conf
