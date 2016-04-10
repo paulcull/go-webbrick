@@ -20,4 +20,4 @@ RUN  go build -ldflags " \
 
 EXPOSE 9001
 #RUN supervisord -c /etc/supervisor/supervisord.conf
-CMD ["/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
+#CMD ["/usr/bin/supervisord -c /etc/supervisor/supervisord.conf"]
