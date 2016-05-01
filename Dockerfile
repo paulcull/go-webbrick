@@ -1,4 +1,4 @@
-FROM golang:1.6
+FROM golang:latest
 MAINTAINER paulcull <dev@pkhome.co.uk>
 
 RUN apt-get -qy update && apt-get -qy install vim-common gcc mercurial supervisor
