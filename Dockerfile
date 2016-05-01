@@ -3,7 +3,6 @@ MAINTAINER paulcull <dev@pkhome.co.uk>
 
 RUN apt-get -qy update && apt-get -qy install vim-common gcc mercurial supervisor
 
-RUN mkdir /go/src/github.com/paulcull/go-webbrick
 ADD        . /go/src/github.com/paulcull/go-webbrick
 WORKDIR    /go/src/github.com/paulcull/go-webbrick
 
