@@ -9,11 +9,11 @@ RUN 	   rm mqtt_webbrick
 
 RUN  go get -v
 RUN  go build -ldflags " \
-       -X main.buildVersion  $(grep "const Version " version.ver | sed -E 's/.*"(.+)"$/\1/' ) \
-       -X main.buildRevision $(git rev-parse --short HEAD) \
-       -X main.buildBranch   $(git rev-parse --abbrev-ref HEAD) \
-       -X main.buildDate     $(date +%Y%m%d-%H:%M:%S) \
-       -X main.goVersion     $GOLANG_VERSION \
+       -X main.buildVersion=$(grep "const Version " ../version.ver | sed -E 's/.*"(.+)"$/\1/' ) \
+       -X main.buildRevision=$(git rev-parse --short HEAD) \
+       -X main.buildBranch=$(git rev-parse --abbrev-ref HEAD) \
+       -X main.buildDate=$(date +%Y%m%d-%H:%M:%S) \
+       -X main.goVersion=$GOLANG_VERSION \
      "
 
 
