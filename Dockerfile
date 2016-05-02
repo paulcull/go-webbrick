@@ -19,5 +19,5 @@ RUN  go build -ldflags " \
 
 ADD etc/supervisor.conf /etc/supervisor/conf.d/go-webbrick.conf
   
-EXPOSE 9001
+EXPOSE 9001 1883
 CMD /usr/bin/supervisord -c /etc/supervisor/conf.d/go-webbrick.conf
