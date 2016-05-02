@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"                     // json encoding
 	"fmt"                               // For outputting messages
-	"github.com/paulcull/go-webbrick"   // For controlling Orvibo stuff
+	"github.com/paulcull/go-webbrick"   // For controlling  stuff
 	"github.com/yosssi/gmq/mqtt"        //mqtt libraries
 	"github.com/yosssi/gmq/mqtt/client" //mqtt libraries
 	"os"                                // For OS Interaction
